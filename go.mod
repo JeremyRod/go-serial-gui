@@ -3,6 +3,7 @@ module github.com/JeremyRod/v2
 go 1.24.2
 
 require (
+	fyne.io/fyne v1.4.3
 	fyne.io/fyne/v2 v2.5.5
 	go.bug.st/serial v1.6.4
 )

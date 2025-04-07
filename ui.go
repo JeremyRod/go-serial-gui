@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strconv"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
@@ -16,11 +18,13 @@ import (
 type SerialSettings struct {
 	portSelect *widget.Select
 	baudRate   *widget.Select
+	baudEntry  *widget.Entry
 	dataBits   *widget.Select
 	stopBits   *widget.Select
 	parityBits *widget.Select
 	serialConf SerialConf
 	connectBtn *widget.Button
+	console    *widget.TextGrid
 }
 
 // NewSerialSettings creates and initializes the serial settings UI components
@@ -44,20 +48,35 @@ func NewSerialSettings(ports []string) *SerialSettings {
 		s.serialConf.Port = ports[0]
 	}
 
+	// Custom baud rate entry
+	s.baudEntry = widget.NewEntry()
+	s.baudEntry.SetPlaceHolder("Enter custom baud rate")
+	s.baudEntry.Disable() // Disabled by default
+	s.baudEntry.OnChanged = func(value string) {
+		if baud, err := strconv.Atoi(value); err == nil {
+			s.serialConf.BaudRate = baud
+		}
+	}
+
 	// Baud rate options
-	baudRates := []string{"9600", "19200", "38400", "57600", "115200"}
+	baudRates := []string{"9600", "19200", "38400", "57600", "115200", "Custom"}
 	s.baudRate = widget.NewSelect(baudRates, func(value string) {
-		switch value {
-		case "9600":
-			s.serialConf.BaudRate = 9600
-		case "19200":
-			s.serialConf.BaudRate = 19200
-		case "38400":
-			s.serialConf.BaudRate = 38400
-		case "57600":
-			s.serialConf.BaudRate = 57600
-		case "115200":
-			s.serialConf.BaudRate = 115200
+		if value == "Custom" {
+			s.baudEntry.Enable()
+		} else {
+			s.baudEntry.Disable()
+			switch value {
+			case "9600":
+				s.serialConf.BaudRate = 9600
+			case "19200":
+				s.serialConf.BaudRate = 19200
+			case "38400":
+				s.serialConf.BaudRate = 38400
+			case "57600":
+				s.serialConf.BaudRate = 57600
+			case "115200":
+				s.serialConf.BaudRate = 115200
+			}
 		}
 	})
 	s.baudRate.SetSelected("9600")
@@ -110,9 +129,11 @@ func NewSerialSettings(ports []string) *SerialSettings {
 	})
 	s.parityBits.SetSelected("None")
 
+	s.console = widget.NewTextGrid()
+
 	// Connect button
 	s.connectBtn = widget.NewButton("Connect", func() {
-		// This will be implemented later
+		CreateLogUI() // TODO: need to pass the serialConf to the logUI
 	})
 
 	return s
@@ -141,7 +162,7 @@ func CreateUI(ports []string) {
 		widget.NewLabel("Port:"),
 		settings.portSelect,
 		widget.NewLabel("Baud Rate:"),
-		settings.baudRate,
+		container.NewGridWithColumns(2, settings.baudRate, settings.baudEntry),
 		widget.NewLabel("Data Bits:"),
 		settings.dataBits,
 		widget.NewLabel("Stop Bits:"),
@@ -151,17 +172,9 @@ func CreateUI(ports []string) {
 		settings.connectBtn,
 	)
 
-	console := container.NewVBox(
-		widget.NewLabel("Console"),
-		widget.NewTextGrid(),
-	)
-
 	w.SetContent(container.NewVBox(
 		list,
-		container.NewHBox(
-			settingsContainer,
-			console,
-		),
+		settingsContainer,
 	))
 	w.Resize(fyne.NewSize(800, 600))
 	w.ShowAndRun()
