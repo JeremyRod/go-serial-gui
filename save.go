@@ -35,3 +35,11 @@ func (f *File) Load() string {
 	}
 	return string(data)
 }
+
+func OpenFile(path string) (File, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return File{nil}, err
+	}
+	return File{file}, nil
+}

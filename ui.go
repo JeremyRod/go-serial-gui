@@ -164,7 +164,7 @@ func NewSerialSettings(ports []string) *SerialSettings {
 
 	// Connect button
 	s.connectBtn = widget.NewButton("Connect", func() {
-		CreateLogUI() // TODO: need to pass the serialConf to the logUI
+		go CreateLogUI(s.serialConf) // TODO: need to pass the serialConf to the logUI
 	})
 
 	return s
@@ -213,6 +213,25 @@ func CreateUI(ports []string) {
 	w.ShowAndRun()
 }
 
-func CreateLogUI() {
+func CreateLogUI(s SerialConf) {
+	w := app.New().NewWindow("Serial Monitor")
+	port, err := s.OpenPort()
+	go func() {
+		if err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+		buffer, err := ReadPort(port)
+		if err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+		file, err := OpenFile()
+		if err != nil {
+			dialog.ShowError(err, w)
+			return
+		}
+		file.Write(buffer)
+	}()
 
 }
