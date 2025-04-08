@@ -6,6 +6,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	"go.bug.st/serial"
 )
@@ -25,6 +26,36 @@ type SerialSettings struct {
 	serialConf SerialConf
 	connectBtn *widget.Button
 	console    *widget.TextGrid
+}
+
+type FileUI struct {
+	fileBtn      *widget.Button
+	selectedFile *widget.Label
+	fileURI      fyne.URI
+}
+
+func (f *FileUI) showFilePicker(w *fyne.Window) {
+	dialog.ShowFileSave(func(uri fyne.URIWriteCloser, err error) {
+		savedFile := "No file selected"
+		if err != nil {
+			dialog.ShowError(err, *w)
+			return
+		}
+		if uri == nil {
+			return
+		}
+		savedFile = uri.URI().Path()
+		f.fileURI = uri.URI()
+		f.selectedFile.SetText(savedFile)
+	}, (*w))
+}
+
+func NewFileUI(w *fyne.Window) *FileUI {
+	f := &FileUI{}
+	f.fileBtn = widget.NewButton("File", func() { f.showFilePicker(w) })
+	f.selectedFile = widget.NewLabel("No file selected")
+	f.fileURI = nil
+	return f
 }
 
 // NewSerialSettings creates and initializes the serial settings UI components
@@ -142,7 +173,7 @@ func NewSerialSettings(ports []string) *SerialSettings {
 func CreateUI(ports []string) {
 	a := app.New()
 	w := a.NewWindow("Serial Monitor")
-
+	fileUI := NewFileUI(&w)
 	list := widget.NewList(
 		func() int {
 			return len(ports)
@@ -169,6 +200,8 @@ func CreateUI(ports []string) {
 		settings.stopBits,
 		widget.NewLabel("Parity:"),
 		settings.parityBits,
+		fileUI.selectedFile,
+		fileUI.fileBtn,
 		settings.connectBtn,
 	)
 

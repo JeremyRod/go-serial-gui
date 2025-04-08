@@ -42,3 +42,20 @@ func (c *SerialConf) ClosePort(port *serial.Port) error {
 	}
 	return nil
 }
+
+func ReadPort(port *serial.Port) ([]byte, error) {
+	buffer := make([]byte, 1024)
+	num, err := (*port).Read(buffer)
+	if err != nil {
+		return nil, err
+	}
+	return buffer[:num], nil
+}
+
+func WritePort(port *serial.Port, data []byte) (int, error) {
+	num, err := (*port).Write(data)
+	if err != nil {
+		return 0, err
+	}
+	return num, nil
+}

@@ -8,6 +8,14 @@ type File struct {
 	file *os.File
 }
 
+func NewFile(path string) (File, error) {
+	file, err := os.Create(path)
+	if err != nil {
+		return File{nil}, err
+	}
+	return File{file}, nil
+
+}
 func (f *File) Close() error {
 	err := f.file.Close()
 	if err != nil {
@@ -16,8 +24,8 @@ func (f *File) Close() error {
 	return nil
 }
 
-func (f *File) Save(data string) {
-	f.file.Write([]byte(data))
+func (f *File) Save(data []byte) {
+	f.file.Write(data)
 }
 
 func (f *File) Load() string {
