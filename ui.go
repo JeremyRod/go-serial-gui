@@ -59,7 +59,7 @@ func NewFileUI(w *fyne.Window) *FileUI {
 }
 
 // NewSerialSettings creates and initializes the serial settings UI components
-func NewSerialSettings(ports []string) *SerialSettings {
+func NewSerialSettings(ports []string, fileUI *FileUI, a *fyne.App, mainWindow *fyne.Window) *SerialSettings {
 	s := &SerialSettings{}
 
 	// Default values for serial configuration
@@ -164,7 +164,7 @@ func NewSerialSettings(ports []string) *SerialSettings {
 
 	// Connect button
 	s.connectBtn = widget.NewButton("Connect", func() {
-		go CreateLogUI(s.serialConf) // TODO: need to pass the serialConf to the logUI
+		CreateLogUI(s.serialConf, fileUI, a, mainWindow) // TODO: need to pass the serialConf to the logUI
 	})
 
 	return s
@@ -186,7 +186,7 @@ func CreateUI(ports []string) {
 		})
 
 	// Create serial settings
-	settings := NewSerialSettings(ports)
+	settings := NewSerialSettings(ports, fileUI, &a, &w)
 
 	// Create a container for all serial settings widgets
 	settingsContainer := container.NewVBox(
@@ -213,25 +213,48 @@ func CreateUI(ports []string) {
 	w.ShowAndRun()
 }
 
-func CreateLogUI(s SerialConf) {
-	w := app.New().NewWindow("Serial Monitor")
+func CreateLogUI(s SerialConf, fileUI *FileUI, a *fyne.App, mainWindow *fyne.Window) {
+	w := (*a).NewWindow("Serial Console")
 	port, err := s.OpenPort()
-	go func() {
+	var file File
+	if err != nil {
+		dialog.ShowError(err, (*mainWindow))
+		return
+	}
+	if fileUI.fileURI != nil {
+		file, err = OpenFile(fileUI.fileURI.Path())
 		if err != nil {
-			dialog.ShowError(err, w)
+			dialog.ShowError(err, (*mainWindow))
 			return
 		}
-		buffer, err := ReadPort(port)
-		if err != nil {
-			dialog.ShowError(err, w)
-			return
-		}
-		file, err := OpenFile()
-		if err != nil {
-			dialog.ShowError(err, w)
-			return
-		}
-		file.Write(buffer)
-	}()
+	}
+	console := widget.NewTextGrid()
 
+	// Add window close handler
+	w.SetOnClosed(func() {
+		if err := s.ClosePort(port); err != nil {
+			dialog.ShowError(err, w)
+		}
+		if file.file != nil {
+			file.Close()
+		}
+	})
+
+	go func(file *File) {
+		for {
+			buffer, err := ReadPort(port)
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+			if file.file != nil {
+				file.Save(buffer)
+			}
+			console.SetText(string(buffer))
+		}
+	}(&file)
+
+	w.SetContent(console)
+	w.Resize(fyne.NewSize(460, 300))
+	w.Show()
 }
