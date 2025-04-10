@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -78,6 +79,17 @@ func NewSerialSettings(ports []string, fileUI *FileUI, a *fyne.App, mainWindow *
 		s.portSelect.SetSelected(ports[0])
 		s.serialConf.Port = ports[0]
 	}
+	go func() {
+		for {
+			ports, err := GetPorts()
+			if err != nil {
+				dialog.ShowError(err, (*mainWindow))
+				return
+			}
+			s.portSelect.SetOptions(ports)
+			time.Sleep(time.Second * 2)
+		}
+	}()
 
 	// Custom baud rate entry
 	s.baudEntry = widget.NewEntry()
