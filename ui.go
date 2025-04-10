@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"go.bug.st/serial"
 )
@@ -171,19 +172,19 @@ func NewSerialSettings(ports []string, fileUI *FileUI, a *fyne.App, mainWindow *
 }
 
 func CreateUI(ports []string) {
-	a := app.New()
+	a := app.NewWithID("com.go-serial-gui.app")
 	w := a.NewWindow("Serial Monitor")
 	fileUI := NewFileUI(&w)
-	list := widget.NewList(
-		func() int {
-			return len(ports)
-		},
-		func() fyne.CanvasObject {
-			return widget.NewLabel("template")
-		},
-		func(i widget.ListItemID, o fyne.CanvasObject) {
-			o.(*widget.Label).SetText(ports[i])
-		})
+	// list := widget.NewList(
+	// 	func() int {
+	// 		return len(ports)
+	// 	},
+	// 	func() fyne.CanvasObject {
+	// 		return widget.NewLabel("template")
+	// 	},
+	// 	func(i widget.ListItemID, o fyne.CanvasObject) {
+	// 		o.(*widget.Label).SetText(ports[i])
+	// 	})
 
 	// Create serial settings
 	settings := NewSerialSettings(ports, fileUI, &a, &w)
@@ -206,7 +207,6 @@ func CreateUI(ports []string) {
 	)
 
 	w.SetContent(container.NewVBox(
-		list,
 		settingsContainer,
 	))
 	w.Resize(fyne.NewSize(800, 600))
@@ -215,6 +215,7 @@ func CreateUI(ports []string) {
 
 func CreateLogUI(s SerialConf, fileUI *FileUI, a *fyne.App, mainWindow *fyne.Window) {
 	w := (*a).NewWindow("Serial Console")
+
 	port, err := s.OpenPort()
 	var file File
 	if err != nil {
@@ -222,13 +223,24 @@ func CreateLogUI(s SerialConf, fileUI *FileUI, a *fyne.App, mainWindow *fyne.Win
 		return
 	}
 	if fileUI.fileURI != nil {
-		file, err = OpenFile(fileUI.fileURI.Path())
+		file, err = NewFile(fileUI.fileURI.Path())
 		if err != nil {
 			dialog.ShowError(err, (*mainWindow))
 			return
 		}
 	}
-	console := widget.NewTextGrid()
+
+	// Use a TextArea instead of TextGrid for better handling of text
+	console := widget.NewMultiLineEntry()
+	console.TextStyle = fyne.TextStyle{Monospace: true}
+	console.Disable() // Make it read-only
+
+	// Create a scrollable container for the console
+	scrollContainer := container.NewScroll(console)
+
+	// Set a fixed size for the scroll container
+	scrollContainer.Resize(fyne.NewSize(600, 400))
+	scrollContainer.ScrollToBottom()
 
 	// Add window close handler
 	w.SetOnClosed(func() {
@@ -241,20 +253,49 @@ func CreateLogUI(s SerialConf, fileUI *FileUI, a *fyne.App, mainWindow *fyne.Win
 	})
 
 	go func(file *File) {
+		terminalBuffer := make([]byte, 1000)
 		for {
 			buffer, err := ReadPort(port)
 			if err != nil {
 				dialog.ShowError(err, w)
+				w.Close()
 				return
 			}
 			if file.file != nil {
-				file.Save(buffer)
+				err := file.Save(buffer)
+				if err != nil {
+					dialog.ShowError(err, w)
+					return
+				}
 			}
-			console.SetText(string(buffer))
+			terminalBuffer = append(terminalBuffer, buffer...)
+			newSegment := &widget.TextSegment{
+				Text: string(terminalBuffer),
+				Style: widget.RichTextStyle{
+					ColorName: theme.ColorNameFocus,
+					TextStyle: fyne.TextStyle{},
+				},
+			}
+
+			console.SetText(newSegment.Text)
+			if len(terminalBuffer) > 1000 {
+				terminalBuffer = terminalBuffer[len(terminalBuffer)-1000:]
+			}
+			if (scrollContainer.Content.MinSize().Height) > scrollContainer.Size().Height {
+				scrollContainer.Offset.Y = scrollContainer.Content.MinSize().Height - scrollContainer.Size().Height
+				scrollContainer.Base.Refresh()
+			}
 		}
 	}(&file)
 
-	w.SetContent(console)
-	w.Resize(fyne.NewSize(460, 300))
+	// Set the content to the scroll container
+	w.SetContent(scrollContainer)
+
+	// Set a fixed window size
+	w.Resize(fyne.NewSize(800, 500))
+
+	// Optional: Prevent window resizing
+	w.SetFixedSize(true)
+
 	w.Show()
 }
