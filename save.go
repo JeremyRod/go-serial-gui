@@ -24,8 +24,12 @@ func (f *File) Close() error {
 	return nil
 }
 
-func (f *File) Save(data []byte) {
-	f.file.Write(data)
+func (f *File) Save(data []byte) error {
+	_, err := f.file.Write(data)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (f *File) Load() string {
